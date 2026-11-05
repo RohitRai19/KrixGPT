@@ -18,14 +18,16 @@ from tools import tools
 
 Path("data").mkdir(exist_ok=True)
 
-DEFAULT_MODEL= os.getenv("GEMINI_MODEL","gemini-2.5-flash")
+DEFAULT_MODEL= os.getenv("GEMINI_MODEL","gemini-3.8-flash")
 
 ALLOWED_MODELS={
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-2.5-flash-lite",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro"
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-pro-preview",
+    "gemini-flash-latest",
+    "gemini-pro-latest"
 }
 
 SYSTEM_PROMPT = """
@@ -80,7 +82,8 @@ def build_agent(model_name: str):
     llm = ChatGoogleGenerativeAI(
         model=selected_model,
         temperature=0.3,
-        streaming=True
+        streaming=True,
+        max_retries=2
     )
 
     llm_with_tools = llm.bind_tools(tools)

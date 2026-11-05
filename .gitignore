@@ -221,3 +221,5 @@ __marimo__/
 
 # Runtime data (SQLite checkpoints, uploads)
 data/
+chroma_db/
+uploads/
