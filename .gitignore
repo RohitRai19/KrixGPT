@@ -219,5 +219,5 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Project virtual environment
-KrixGPT/
+# Runtime data (SQLite checkpoints, uploads)
+data/
