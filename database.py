@@ -199,6 +199,39 @@ def save_chat_message(thread_id: str, role: str, content: str):
         db.close()
 
 
+def update_conversation_title(thread_id: str, title: str) -> None:
+    db = SessionLocal()
+
+    try:
+        conversation = (
+            db.query(Conversation)
+            .filter(Conversation.thread_id == thread_id)
+            .first()
+        )
+
+        if conversation and title:
+            conversation.title = title[:80]
+            db.commit()
+
+    finally:
+        db.close()
+
+
+def count_messages(thread_id: str, role: str | None = None) -> int:
+    db = SessionLocal()
+
+    try:
+        query = db.query(ChatMessage).filter(ChatMessage.thread_id == thread_id)
+
+        if role:
+            query = query.filter(ChatMessage.role == role)
+
+        return query.count()
+
+    finally:
+        db.close()
+
+
 def conversation_owner(thread_id: str) -> str | None:
     """Return the owning user_id, or None if the conversation is missing/unowned."""
     db = SessionLocal()

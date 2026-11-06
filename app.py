@@ -32,7 +32,11 @@ from database import (
     list_conversations,
     list_conversations_by_ids,
     claim_conversations,
-    conversation_owner)
+    conversation_owner,
+    update_conversation_title,
+    count_messages)
+
+from titles import generate_title
 
 from auth import (
     SESSION_COOKIE_NAME,
@@ -343,6 +347,9 @@ async def chat_stream(request: Request, user: dict | None = Depends(get_optional
 
     set_current_thread_id(thread_id)
 
+    # Title the thread after its first full exchange, like ChatGPT does.
+    is_first_turn = count_messages(thread_id, role="assistant") == 0
+
     config = {
         "configurable": {
             "thread_id": thread_id
@@ -375,6 +382,11 @@ async def chat_stream(request: Request, user: dict | None = Depends(get_optional
 
             if final_answer.strip():
                 save_chat_message(thread_id, "assistant", final_answer)
+
+                if is_first_turn:
+                    title = generate_title(user_message, final_answer)
+                    update_conversation_title(thread_id, title)
+                    yield sse_data({"title": title})
 
             yield sse_data({"done": True})
 

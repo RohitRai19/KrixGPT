@@ -1868,6 +1868,7 @@ async function loadConversations() {
             if (conv.thread_id === threadId) {
                 item.classList.add("active");
                 topbarTitle.textContent = conv.title || "New chat";
+                document.title = `${conv.title || "New chat"} · KrixGPT`;
             }
             item.textContent = conv.title || "New chat";
             item.title = conv.title || "New chat";
@@ -1909,6 +1910,7 @@ async function loadConversation(selectedThreadId) {
 
 function renderWelcome() {
     topbarTitle.textContent = "Agentic AI Chatbot";
+    document.title = "KrixGPT";
     chatContainer.innerHTML = `
         <div class="welcome" id="welcome">
             <h1>How can I help you today?</h1>
@@ -1995,6 +1997,11 @@ async function sendMessage() {
             botElement.textContent = accumulated;
             botElement.dataset.raw = accumulated;
             scrollToBottom();
+        }
+
+        if (data.title) {
+            topbarTitle.textContent = data.title;
+            document.title = `${data.title} · KrixGPT`;
         }
 
         if (data.error) {
