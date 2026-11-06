@@ -45,8 +45,9 @@ def _get_llm():
         _llm = create_chat_model(
             TITLE_MODEL,
             temperature=0.2,
-            max_tokens=24,
+            max_tokens=200,
             max_retries=0,
+            reasoning_effort="low",
         )
     return _llm
 

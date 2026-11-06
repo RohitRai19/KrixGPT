@@ -42,9 +42,9 @@ MODELS = [
     ("grok-4-fast", "xai", "Grok 4 Fast"),
     ("grok-4", "xai", "Grok 4"),
     ("grok-3-mini", "xai", "Grok 3 Mini"),
-    ("llama-3.3-70b-versatile", "groq", "Llama 3.3 70B"),
     ("openai/gpt-oss-120b", "groq", "GPT-OSS 120B"),
-    ("llama-3.1-8b-instant", "groq", "Llama 3.1 8B (fastest)"),
+    ("qwen/qwen3.8-27b", "groq", "Qwen 3.8 27B"),
+    ("openai/gpt-oss-20b", "groq", "GPT-OSS 20B (fastest)"),
     ("gemini-3.8-flash", "gemini", "Gemini 3.8 Flash"),
     ("gemini-3.7-flash", "gemini", "Gemini 3.7 Flash"),
     ("gemini-3.5-flash", "gemini", "Gemini 3.5 Flash"),
@@ -57,7 +57,7 @@ MODELS = [
 # Cheapest sensible model per provider, used for background jobs like titles.
 CHEAP_MODELS = {
     "xai": "grok-3-mini",
-    "groq": "llama-3.1-8b-instant",
+    "groq": "openai/gpt-oss-20b",
     "gemini": "gemini-3.5-flash-lite",
 }
 
@@ -201,6 +201,7 @@ def create_chat_model(
     streaming: bool = False,
     max_retries: int = 2,
     max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
 ):
     """Build a LangChain chat model for any registered model id."""
     model_id = normalize_model_name(model_id)
@@ -231,4 +232,8 @@ def create_chat_model(
     )
     if max_tokens:
         kwargs["max_tokens"] = max_tokens
+    if "gpt-oss" in model_id and reasoning_effort:
+        # Reasoning models spend tokens thinking before answering; keep short
+        # background jobs (titles) cheap and fast.
+        kwargs["reasoning_effort"] = reasoning_effort
     return ChatOpenAI(**kwargs)
