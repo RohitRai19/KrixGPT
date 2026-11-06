@@ -972,7 +972,15 @@ textarea:focus-visible,
 
 .top-signin:hover { background: var(--accent-soft); }
 
-.top-signin svg { width: 14px; height: 14px; }
+.top-signin svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
 
 .guest .top-signin { display: inline-flex; }
 .guest #logoutBtn { display: none; }
