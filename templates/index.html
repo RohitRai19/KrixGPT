@@ -1238,10 +1238,16 @@ textarea:focus-visible,
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script type="application/json" id="serverState">{"firebase": {{ firebase_config | safe }}, "user": {{ current_user | tojson }}}</script>
+
 <script>
-/* ---------- Server-provided state (Jinja) ---------- */
-const FIREBASE_CONFIG = {{ firebase_config | safe }};
-let currentUser = {{ current_user | tojson }};
+/* ---------- Server-provided state (rendered by Jinja into #serverState) ---------- */
+const SERVER_STATE = (() => {
+    try { return JSON.parse(document.getElementById("serverState").textContent); }
+    catch (e) { console.error("Bad server state:", e); return { firebase: {}, user: null }; }
+})();
+const FIREBASE_CONFIG = SERVER_STATE.firebase || {};
+let currentUser = SERVER_STATE.user || null;
 
 /* ---------- Element refs ---------- */
 const chatContainer = document.getElementById("chatContainer");
