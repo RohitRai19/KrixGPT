@@ -4,6 +4,7 @@ from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 from database import save_memory,search_memory
 from rag import retrieve_from_rag
+from extra_tools import get_weather, get_stock_price
 
 
 
@@ -105,5 +106,7 @@ tools = [
     search_uploaded_documents,
     remember_this,
     recall_memory,
-    web_search
+    web_search,
+    get_weather,
+    get_stock_price,
 ]

@@ -1821,8 +1821,13 @@ function detectLikelyTool(message) {
     const memoryRecallPattern = /what do you remember|recall|my memory|remember about me/;
     const webSearchPattern = /latest|current|today|now|recent|news|search web|web search|internet|online|price|version|update|2025|2026|who is|what is happening|trending|release|new model|current ceo|latest version/;
 
+    const weatherPattern = /weather|temperature|forecast|rain|humidity|how hot|how cold|climate today/;
+    const stockPattern = /stock|share price|ticker|nasdaq|nifty|sensex|market cap|[A-Z]{2,5}\.NS|\$[A-Z]{2,5}/;
+
     if (memorySavePattern.test(text)) return "Memory Save";
     if (memoryRecallPattern.test(text)) return "Memory Recall";
+    if (weatherPattern.test(text)) return "Weather";
+    if (stockPattern.test(text) || stockPattern.test(message)) return "Stock Market";
     if (ragPattern.test(text)) return "Document Search";
     if (webSearchPattern.test(text)) return "Web Search";
     if (mathPattern.test(text)) return "Calculator";
@@ -1947,6 +1952,16 @@ function renderWelcome() {
                 <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0-3 4v1a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-1a4 4 0 0 0-3-4V7a4 4 0 0 0-4-4z"/></svg></span>
                 <span>Save to memory</span>
                 <span class="card-sub">Store a fact for later</span>
+            </button>
+            <button class="card" onclick="usePrompt('What is the weather in Mumbai right now?')">
+                <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></span>
+                <span>Check the weather</span>
+                <span class="card-sub">Live conditions and forecast</span>
+            </button>
+            <button class="card" onclick="usePrompt('How is Apple stock doing today?')">
+                <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></span>
+                <span>Stock prices</span>
+                <span class="card-sub">Quotes and market stats</span>
             </button>
             <button class="card" onclick="usePrompt('Calculate 125 * 48 / 6')">
                 <span class="card-icon"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M12 10h2M16 10h0M8 14h2M12 14h2M16 14h0M8 18h2M12 18h2M16 18h0"/></svg></span>
