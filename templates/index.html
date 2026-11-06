@@ -1213,7 +1213,7 @@ textarea:focus-visible,
                     </button>
                 </div>
             </div>
-            <div class="notice" id="noticeText">KrixGPT can make mistakes. Check important info.</div>
+            <div class="notice" id="noticeText" aria-live="polite"></div>
         </div>
     </main>
 </div>
@@ -1268,7 +1268,7 @@ const backdrop = document.getElementById("backdrop");
 const toastEl = document.getElementById("toast");
 const topbarTitle = document.getElementById("topbarTitle");
 
-const DEFAULT_NOTICE = "KrixGPT can make mistakes. Check important info.";
+const DEFAULT_NOTICE = "";
 const DEFAULT_MODEL = modelSelect.dataset.default || (modelSelect.options[0] ? modelSelect.options[0].value : "");
 
 const authOverlay = document.getElementById("authOverlay");
