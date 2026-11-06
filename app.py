@@ -30,6 +30,8 @@ from database import (
     get_chat_history,
     create_or_update_conversation,
     list_conversations,
+    list_conversations_by_ids,
+    claim_conversations,
     conversation_owner)
 
 from auth import (
@@ -66,11 +68,18 @@ FIREBASE_WEB_CONFIG = {
 }
 
 
-def _ensure_owner(thread_id: str, user: dict):
-    """Reject access to a conversation owned by a different user."""
+def _ensure_owner(thread_id: str, user: dict | None):
+    """
+    Reject access to a conversation owned by a different user.
+    Guests (user is None) may only touch unowned conversations.
+    """
     owner = conversation_owner(thread_id)
-    if owner is not None and owner != user["uid"]:
+    if owner is not None and (user is None or owner != user["uid"]):
         raise HTTPException(status_code=403, detail="This conversation belongs to another user.")
+
+
+def _uid(user: dict | None) -> str | None:
+    return user["uid"] if user else None
 
 
 @app.get("/")
@@ -102,6 +111,11 @@ async def auth_login(request: Request):
 
     user = verify_firebase_id_token(id_token)
 
+    # Conversations started as a guest in this browser become the user's.
+    guest_thread_ids = data.get("guestThreadIds") or []
+    if isinstance(guest_thread_ids, list):
+        claim_conversations([str(t) for t in guest_thread_ids][:200], user["uid"])
+
     response = JSONResponse({"user": user})
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
@@ -132,8 +146,15 @@ async def auth_me(request: Request):
 
 
 @app.get("/conversations")
-async def conversations(user: dict = Depends(get_current_user)):
-    items = list_conversations(user_id=user["uid"])
+async def conversations(
+    thread_ids: str = "",
+    user: dict | None = Depends(get_optional_user)
+):
+    if user:
+        items = list_conversations(user_id=user["uid"])
+    else:
+        ids = [t for t in thread_ids.split(",") if t][:200]
+        items = list_conversations_by_ids(ids)
 
     return {
         "conversations": [
@@ -150,7 +171,7 @@ async def conversations(user: dict = Depends(get_current_user)):
 
 
 @app.get("/history/{thread_id}")
-async def history(thread_id: str, user: dict = Depends(get_current_user)):
+async def history(thread_id: str, user: dict | None = Depends(get_optional_user)):
     _ensure_owner(thread_id, user)
     messages = get_chat_history(thread_id)
 
@@ -171,7 +192,7 @@ async def history(thread_id: str, user: dict = Depends(get_current_user)):
 async def upload_document(
     file: UploadFile = File(...),
     thread_id: str = Form(...),
-    user: dict = Depends(get_current_user)
+    user: dict | None = Depends(get_optional_user)
 ):
     _ensure_owner(thread_id, user)
 
@@ -197,7 +218,7 @@ async def upload_document(
         with open(file_path, "wb") as f:
             f.write(await file.read())
 
-        create_or_update_conversation(thread_id, "Uploaded document", user_id=user["uid"])
+        create_or_update_conversation(thread_id, "Uploaded document", user_id=_uid(user))
 
         result = add_document_to_rag(
             file_path=file_path,
@@ -294,7 +315,7 @@ def extract_text_from_chunk(chunk) -> str:
 
 
 @app.post("/chat/stream")
-async def chat_stream(request: Request, user: dict = Depends(get_current_user)):
+async def chat_stream(request: Request, user: dict | None = Depends(get_optional_user)):
     try:
         data = await request.json()
     except Exception:
@@ -317,7 +338,7 @@ async def chat_stream(request: Request, user: dict = Depends(get_current_user)):
 
     agent = get_agent(selected_model)
 
-    create_or_update_conversation(thread_id, user_message, user_id=user["uid"])
+    create_or_update_conversation(thread_id, user_message, user_id=_uid(user))
     save_chat_message(thread_id, "user", user_message)
 
     set_current_thread_id(thread_id)

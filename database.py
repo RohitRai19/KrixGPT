@@ -130,6 +130,47 @@ def list_conversations(user_id: str | None = None):
         db.close()
 
 
+def list_conversations_by_ids(thread_ids: list[str]):
+    """Guest sidebar: only unowned conversations whose ids the browser remembers."""
+    if not thread_ids:
+        return []
+
+    db = SessionLocal()
+
+    try:
+        return (
+            db.query(Conversation)
+            .filter(Conversation.thread_id.in_(thread_ids))
+            .filter(Conversation.user_id.is_(None))
+            .order_by(Conversation.updated_at.desc())
+            .all()
+        )
+
+    finally:
+        db.close()
+
+
+def claim_conversations(thread_ids: list[str], user_id: str) -> int:
+    """Attach guest (unowned) conversations to a user who just signed in."""
+    if not thread_ids or not user_id:
+        return 0
+
+    db = SessionLocal()
+
+    try:
+        updated = (
+            db.query(Conversation)
+            .filter(Conversation.thread_id.in_(thread_ids))
+            .filter(Conversation.user_id.is_(None))
+            .update({Conversation.user_id: user_id}, synchronize_session=False)
+        )
+        db.commit()
+        return updated
+
+    finally:
+        db.close()
+
+
 def save_chat_message(thread_id: str, role: str, content: str):
     db = SessionLocal()
 

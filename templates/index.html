@@ -946,6 +946,62 @@ textarea:focus-visible,
     text-overflow: ellipsis;
 }
 
+.signin-btn {
+    margin-top: 8px;
+    justify-content: center;
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.signin-btn:hover { background: var(--accent-soft); }
+
+.signin-btn svg { width: 16px; height: 16px; }
+
+.top-signin {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.top-signin:hover { background: var(--accent-soft); }
+
+.top-signin svg { width: 14px; height: 14px; }
+
+.guest .top-signin { display: inline-flex; }
+.guest #logoutBtn { display: none; }
+.guest #signInBtn { display: flex; }
+#signInBtn { display: none; }
+
+.auth-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.auth-card { position: relative; }
+
+.auth-guest-link {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.auth-guest-link:hover { color: var(--text); }
+
+@media (max-width: 480px) {
+    .top-signin span { display: none; }
+    .top-signin { padding: 7px 9px; }
+}
+
 /* ---------- Toast ---------- */
 .toast {
     position: fixed;
@@ -1077,6 +1133,10 @@ textarea:focus-visible,
                     <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
                 </button>
             </div>
+            <button class="new-chat signin-btn" id="signInBtn" onclick="showLogin()">
+                <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+                Sign in to save chats
+            </button>
         </div>
     </aside>
 
@@ -1090,6 +1150,10 @@ textarea:focus-visible,
                 <span class="status-dot"></span>
                 <span class="status-label" id="status">Ready</span>
             </div>
+            <button class="top-signin" onclick="showLogin()" id="topSignIn">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                <span>Sign in</span>
+            </button>
             <button class="icon-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">
                 <svg viewBox="0 0 24 24" id="themeIcon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
             </button>
@@ -1153,17 +1217,21 @@ textarea:focus-visible,
 
 <div class="auth-overlay" id="authOverlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
     <div class="auth-card">
+        <button class="icon-btn auth-close" onclick="hideLogin()" aria-label="Close">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
         <div class="brand">
             <span class="brand-mark">K</span>
             <span>KrixGPT</span>
         </div>
-        <h2 id="authTitle">Welcome back</h2>
-        <p>Sign in to keep your chats, documents and memory in one place.</p>
+        <h2 id="authTitle">Sign in to KrixGPT</h2>
+        <p>Keep your chats, documents and memory across devices. Chats you started as a guest in this browser come with you.</p>
         <button class="google-btn" id="googleBtn" onclick="signInWithGoogle()">
             <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path fill="#34A853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC04" d="M6.4 14a6 6 0 0 1 0-3.9V7.5H3.1a10 10 0 0 0 0 9z"/><path fill="#EA4335" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.8 9.4 6 12 6z"/></svg>
             Continue with Google
         </button>
         <div class="auth-error" id="authError" aria-live="polite"></div>
+        <button class="auth-guest-link" onclick="hideLogin()">Continue as guest</button>
         <div class="auth-foot">Powered by Firebase Authentication</div>
     </div>
 </div>
@@ -1209,12 +1277,15 @@ try {
     console.error("Firebase init failed:", e);
 }
 
-function showLogin(message = "") {
-    currentUser = null;
-    renderUserChip();
+function showLogin(message = "", expired = false) {
+    if (expired) {
+        currentUser = null;
+        renderUserChip();
+    }
     authError.textContent = message;
     authOverlay.classList.add("show");
     document.querySelector(".app").setAttribute("aria-hidden", "true");
+    if (isMobile()) closeSidebar();
 }
 
 function hideLogin() {
@@ -1228,6 +1299,8 @@ function renderUserChip() {
     const email = document.getElementById("userEmail");
     const logoutBtn = document.getElementById("logoutBtn");
 
+    document.body.classList.toggle("guest", !currentUser);
+
     if (!currentUser) {
         if (avatar.tagName === "IMG") {
             const span = document.createElement("span");
@@ -1236,9 +1309,9 @@ function renderUserChip() {
             avatar.replaceWith(span);
             avatar = span;
         }
-        avatar.textContent = "?";
-        name.textContent = "Not signed in";
-        email.textContent = "";
+        avatar.textContent = "G";
+        name.textContent = "Guest";
+        email.textContent = "Chats stay in this browser only";
         logoutBtn.style.display = "none";
         return;
     }
@@ -1261,17 +1334,21 @@ function renderUserChip() {
 }
 
 async function finishLogin(idToken) {
+    const guestThreadIds = guestThreads();
     const response = await fetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken })
+        body: JSON.stringify({ idToken, guestThreadIds })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
         throw new Error(data.detail || data.error || "Login failed.");
     }
+    const carryThread = threadId;
     currentUser = data.user;
+    if (carryThread) safeSet(threadKey(), carryThread);
     threadId = resolveThreadId();
+    safeSet("guest_threads", "[]");
     renderUserChip();
     hideLogin();
     showToast(`Signed in as ${currentUser.name || currentUser.email}`);
@@ -1333,18 +1410,21 @@ async function logout() {
         try { await firebase.auth().signOut(); } catch (e) { /* ignore */ }
     }
     if (isDictating) stopDictation();
-    threadId = null;
-    chatContainer.innerHTML = "";
-    conversationList.innerHTML = "";
+    currentUser = null;
+    threadId = crypto.randomUUID();
+    safeSet(threadKey(), threadId);
+    renderUserChip();
     closeSidebar();
-    showLogin();
+    renderWelcome();
+    await loadConversations();
+    showToast("Signed out. You're browsing as a guest.");
 }
 
 /* fetch wrapper: any 401 sends the user back to the login screen */
 async function api(url, options) {
     const response = await fetch(url, options);
     if (response.status === 401) {
-        showLogin("Your session has expired. Please sign in again.");
+        showLogin("Your session has expired. Please sign in again.", true);
         throw new Error("Not authenticated.");
     }
     return response;
@@ -1366,7 +1446,25 @@ function resolveThreadId() {
     return id;
 }
 
-let threadId = currentUser ? resolveThreadId() : null;
+/* Guests have no server-side account, so the browser remembers which
+   threads it created and asks the server for exactly those. */
+function guestThreads() {
+    try {
+        const list = JSON.parse(safeGet("guest_threads") || "[]");
+        return Array.isArray(list) ? list : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function rememberGuestThread(id) {
+    if (currentUser || !id) return;
+    const list = guestThreads().filter(x => x !== id);
+    list.unshift(id);
+    safeSet("guest_threads", JSON.stringify(list.slice(0, 50)));
+}
+
+let threadId = resolveThreadId();
 
 const savedModel = safeGet("selected_model");
 const modelValues = Array.from(modelSelect.options).map(o => o.value);
@@ -1741,7 +1839,10 @@ function completeToolProgress(toolProgress, toolName) {
 /* ---------- Conversations ---------- */
 async function loadConversations() {
     try {
-        const response = await api("/conversations");
+        const url = currentUser
+            ? "/conversations"
+            : "/conversations?thread_ids=" + encodeURIComponent(guestThreads().join(","));
+        const response = await api(url);
         const data = await response.json();
         conversationList.innerHTML = "";
 
@@ -1856,6 +1957,7 @@ async function sendMessage() {
     const selectedModel = modelSelect.value || DEFAULT_MODEL;
 
     addMessage("user", message);
+    rememberGuestThread(threadId);
     messageInput.value = "";
     messageInput.style.height = "auto";
     sendBtn.disabled = true;
@@ -1974,6 +2076,7 @@ async function uploadFile() {
     if (!fileInput.files.length) return;
 
     const file = fileInput.files[0];
+    rememberGuestThread(threadId);
     addMessage("user", `📎 Uploaded document: ${file.name}`);
     const toolProgress = addToolProgress("Document Ingestion");
     setStatus("Ingesting document", true);
@@ -2023,13 +2126,9 @@ async function bootstrapChat() {
 }
 
 renderUserChip();
-if (currentUser) {
-    hideLogin();
-    bootstrapChat();
-} else {
-    showLogin();
-    handleRedirectResult();
-}
+hideLogin();
+bootstrapChat();
+if (!currentUser) handleRedirectResult();
 </script>
 </body>
 </html>
