@@ -43,7 +43,8 @@ class LongTermMemory(Base):
     __tablename__ = "long_term_memory"
 
     id = Column(Integer, primary_key=True, index=True)
-    thread_id = Column(String, index=True)
+    thread_id = Column(String, index=True)          # where it was said
+    owner_id = Column(String, index=True, nullable=True)  # who it belongs to: uid or guest:<id>
     memory = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -56,6 +57,19 @@ def init_db():
 def _migrate():
     """Add columns introduced after the first release to existing SQLite files."""
     inspector = inspect(engine)
+
+    memory_columns = {c["name"] for c in inspector.get_columns("long_term_memory")}
+    if "owner_id" not in memory_columns:
+        with engine.begin() as conn:
+            try:
+                conn.execute(text("ALTER TABLE long_term_memory ADD COLUMN owner_id VARCHAR"))
+            except OperationalError as exc:
+                if "duplicate column" not in str(exc).lower():
+                    raise
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_long_term_memory_owner_id ON long_term_memory (owner_id)"))
+            # Memories saved before owner scoping stay reachable from their thread.
+            conn.execute(text("UPDATE long_term_memory SET owner_id = thread_id WHERE owner_id IS NULL"))
+
     columns = {c["name"] for c in inspector.get_columns("conversations")}
 
     if "user_id" not in columns:
@@ -263,12 +277,13 @@ def get_chat_history(thread_id: str):
         db.close()
 
 
-def save_memory(thread_id: str, memory: str):
+def save_memory(thread_id: str, memory: str, owner_id: str | None = None):
     db = SessionLocal()
 
     try:
         item = LongTermMemory(
             thread_id=thread_id,
+            owner_id=owner_id or thread_id,
             memory=memory,
             created_at=datetime.utcnow()
         )
@@ -282,13 +297,33 @@ def save_memory(thread_id: str, memory: str):
         db.close()
 
 
-def search_memory(thread_id: str, query: str):
+def claim_memories(guest_owner_id: str, user_id: str) -> int:
+    """Re-home a guest's memories to the account they just signed in to."""
+    if not guest_owner_id or not user_id:
+        return 0
+
+    db = SessionLocal()
+
+    try:
+        updated = (
+            db.query(LongTermMemory)
+            .filter(LongTermMemory.owner_id == guest_owner_id)
+            .update({LongTermMemory.owner_id: user_id}, synchronize_session=False)
+        )
+        db.commit()
+        return updated
+
+    finally:
+        db.close()
+
+
+def search_memory(thread_id: str, query: str, owner_id: str | None = None):
     db = SessionLocal()
 
     try:
         memories = (
             db.query(LongTermMemory)
-            .filter(LongTermMemory.thread_id == thread_id)
+            .filter(LongTermMemory.owner_id == (owner_id or thread_id))
             .order_by(LongTermMemory.created_at.desc())
             .limit(20)
             .all()

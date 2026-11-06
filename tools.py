@@ -32,6 +32,16 @@ def set_current_thread_id(thread_id:str):
     global CURRENT_THREAD_ID
     CURRENT_THREAD_ID= thread_id
 
+
+# Memory is scoped to a person, not a chat: the signed-in uid, or a stable
+# per-browser guest id. Set by the request handler before the agent runs.
+CURRENT_OWNER_ID = "default"
+
+
+def set_current_owner_id(owner_id: str):
+    global CURRENT_OWNER_ID
+    CURRENT_OWNER_ID = owner_id or CURRENT_THREAD_ID
+
 web_search= TavilySearch(
     max_results=5,
     topic="general",
@@ -73,7 +83,8 @@ def remember_this(memory:str)-> str:
     """
     return save_memory(
         thread_id=CURRENT_THREAD_ID,
-        memory=memory
+        memory=memory,
+        owner_id=CURRENT_OWNER_ID
     )
 
 
@@ -85,7 +96,8 @@ def recall_memory(query:str)-> str:
 
     return search_memory(
         thread_id=CURRENT_THREAD_ID,
-        query=query
+        query=query,
+        owner_id=CURRENT_OWNER_ID
     )
 
 

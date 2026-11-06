@@ -1355,7 +1355,7 @@ async function finishLogin(idToken) {
     const response = await fetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, guestThreadIds })
+        body: JSON.stringify({ idToken, guestThreadIds, guestId: guestId() })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -1482,6 +1482,17 @@ function rememberGuestThread(id) {
 }
 
 let threadId = resolveThreadId();
+
+/* A stable id for this browser so a guest's memories survive across chats
+   (and move into their account when they sign in). */
+function guestId() {
+    let id = safeGet("guest_id");
+    if (!id) {
+        id = crypto.randomUUID();
+        safeSet("guest_id", id);
+    }
+    return id;
+}
 
 const savedModel = safeGet("selected_model");
 const modelValues = Array.from(modelSelect.options).map(o => o.value);
@@ -2064,7 +2075,7 @@ async function sendMessage() {
         const response = await api("/chat/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message, thread_id: threadId, model: selectedModel })
+            body: JSON.stringify({ message, thread_id: threadId, model: selectedModel, guest_id: guestId() })
         });
 
         if (!response.ok) {

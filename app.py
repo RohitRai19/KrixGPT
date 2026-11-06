@@ -32,6 +32,7 @@ from database import (
     list_conversations,
     list_conversations_by_ids,
     claim_conversations,
+    claim_memories,
     conversation_owner,
     update_conversation_title,
     count_messages)
@@ -48,7 +49,7 @@ from auth import (
     get_optional_user)
 
 from rag import add_document_to_rag
-from tools import set_current_thread_id
+from tools import set_current_thread_id, set_current_owner_id
 
 
 app = FastAPI()
@@ -122,6 +123,11 @@ async def auth_login(request: Request):
     guest_thread_ids = data.get("guestThreadIds") or []
     if isinstance(guest_thread_ids, list):
         claim_conversations([str(t) for t in guest_thread_ids][:200], user["uid"])
+
+    # Memories saved while browsing as a guest follow the user into their account.
+    guest_id = str(data.get("guestId") or "").strip()[:64]
+    if guest_id:
+        claim_memories(f"guest:{guest_id}", user["uid"])
 
     response = JSONResponse({"user": user})
     response.set_cookie(
@@ -349,6 +355,10 @@ async def chat_stream(request: Request, user: dict | None = Depends(get_optional
     save_chat_message(thread_id, "user", user_message)
 
     set_current_thread_id(thread_id)
+
+    guest_id = str(data.get("guest_id") or "").strip()[:64]
+    owner_id = user["uid"] if user else (f"guest:{guest_id}" if guest_id else thread_id)
+    set_current_owner_id(owner_id)
 
     # Title the thread after its first full exchange, like ChatGPT does.
     is_first_turn = count_messages(thread_id, role="assistant") == 0
