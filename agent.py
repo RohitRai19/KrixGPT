@@ -9,26 +9,14 @@ load_dotenv()
 os.environ["SSL_CERT_FILE"]=certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"]=certifi.where()
 
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph,START,MessagesState
 from langgraph.prebuilt import  ToolNode,tools_condition
 from langgraph.checkpoint.sqlite import SqliteSaver
 from tools import tools
+from providers import normalize_model_name, create_chat_model, default_model, fallback_models
 
 Path("data").mkdir(exist_ok=True)
-
-DEFAULT_MODEL= os.getenv("GEMINI_MODEL","gemini-3.8-flash")
-
-ALLOWED_MODELS={
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-pro-preview",
-    "gemini-flash-latest",
-    "gemini-pro-latest"
-}
 
 SYSTEM_PROMPT = """
 You are a helpful Agentic AI assistant named KrixGPT similar to ChatGPT.
@@ -52,41 +40,31 @@ Rules:
 - Be clear, helpful, and concise.
 """
 
-def normalize_model_name(model_name: str | None) -> str:
-    """
-    Validate selected model from frontend.
-    If model is missing or not allowed, fallback to DEFAULT_MODEL.
-    """
-
-    if not model_name:
-        return DEFAULT_MODEL
-
-    model_name = model_name.strip()
-
-    if model_name not in ALLOWED_MODELS:
-        return DEFAULT_MODEL
-
-    return model_name
-
-
-
-
 def build_agent(model_name: str):
     """
-    Build one LangGraph agent for a selected Gemini model.
+    Build one LangGraph agent for a selected model (Grok, Groq or Gemini).
     """
 
     selected_model = normalize_model_name(model_name)
 
-    # Initialize ChatGoogleGenerativeAI
-    llm = ChatGoogleGenerativeAI(
-        model=selected_model,
+    llm = create_chat_model(
+        selected_model,
         temperature=0.3,
         streaming=True,
-        max_retries=2
+        max_retries=1,
     )
 
     llm_with_tools = llm.bind_tools(tools)
+
+    # If the chosen provider fails (daily quota, outage, rejected key), retry
+    # the same request on another configured provider instead of surfacing
+    # the error. The next message goes back to the user's chosen model.
+    backups = [
+        create_chat_model(m, temperature=0.3, streaming=True, max_retries=1).bind_tools(tools)
+        for m in fallback_models(selected_model)
+    ]
+    if backups:
+        llm_with_tools = llm_with_tools.with_fallbacks(backups)
 
     def chatbot_node(state: MessagesState):
         messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]

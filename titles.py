@@ -13,9 +13,11 @@ import re
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from providers import cheap_model, create_chat_model
+
 load_dotenv()
 
-TITLE_MODEL = os.getenv("TITLE_MODEL", "gemini-3.5-flash-lite")
+TITLE_MODEL = os.getenv("TITLE_MODEL") or cheap_model()
 TITLES_ENABLED = os.getenv("GENERATE_TITLES", "true").lower() not in {"0", "false", "no"}
 
 MAX_TITLE_CHARS = 48
@@ -40,12 +42,10 @@ _llm = None
 def _get_llm():
     global _llm
     if _llm is None:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
-        _llm = ChatGoogleGenerativeAI(
-            model=TITLE_MODEL,
+        _llm = create_chat_model(
+            TITLE_MODEL,
             temperature=0.2,
-            max_output_tokens=24,
+            max_tokens=24,
             max_retries=0,
         )
     return _llm

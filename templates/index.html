@@ -1189,14 +1189,17 @@ textarea:focus-visible,
                     </button>
 
                     <div class="model-select-wrap">
-                        <select id="modelSelect" class="model-select" title="Select model" aria-label="Select model">
-                            <option value="gemini-3.8-flash">gemini-3.8-flash</option>
-                            <option value="gemini-3.7-flash">gemini-3.7-flash</option>
-                            <option value="gemini-3.5-flash">gemini-3.5-flash</option>
-                            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
-                            <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
-                            <option value="gemini-flash-latest">gemini-flash-latest</option>
-                            <option value="gemini-pro-latest">gemini-pro-latest</option>
+                        <select id="modelSelect" class="model-select" title="Select model" aria-label="Select model" data-default="{{ default_model }}">
+                            {% for group in model_groups %}
+                            <optgroup label="{{ group.label }}">
+                                {% for m in group.models %}
+                                <option value="{{ m.id }}"{% if m.id == default_model %} selected{% endif %}>{{ m.label }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                            {% if not model_groups %}
+                            <option value="">No model configured</option>
+                            {% endif %}
                         </select>
                     </div>
 
@@ -1266,7 +1269,7 @@ const toastEl = document.getElementById("toast");
 const topbarTitle = document.getElementById("topbarTitle");
 
 const DEFAULT_NOTICE = "KrixGPT can make mistakes. Check important info.";
-const DEFAULT_MODEL = modelSelect.options[0].value;
+const DEFAULT_MODEL = modelSelect.dataset.default || (modelSelect.options[0] ? modelSelect.options[0].value : "");
 
 const authOverlay = document.getElementById("authOverlay");
 const authError = document.getElementById("authError");
@@ -1481,9 +1484,14 @@ if (savedModel && modelValues.includes(savedModel)) {
     safeSet("selected_model", DEFAULT_MODEL);
 }
 
+function modelLabel(value) {
+    const opt = Array.from(modelSelect.options).find(o => o.value === value);
+    return opt ? opt.textContent.trim() : value;
+}
+
 modelSelect.addEventListener("change", () => {
     safeSet("selected_model", modelSelect.value);
-    showToast(`Model set to ${modelSelect.value}`);
+    showToast(`Model set to ${modelLabel(modelSelect.value)}`);
 });
 
 function safeGet(key) {
@@ -1594,11 +1602,11 @@ function describeError(raw, model) {
             body: `${model} isn't available for this API key. Choose another model from the selector.`
         };
     }
-    if (/401|403|API key|PERMISSION_DENIED/i.test(text)) {
+    if (/Error code: 400|401|403|API key|PERMISSION_DENIED|invalid_api_key/i.test(text)) {
         return {
             level: "error",
-            title: "Authentication problem",
-            body: "The server could not authenticate with the model provider. Check the API key configuration."
+            title: "Provider rejected the request",
+            body: `The provider for ${model} refused the request, usually because its API key is missing or invalid. Pick another model from the selector, or fix the key on the server.`
         };
     }
     return {
@@ -1969,7 +1977,7 @@ async function sendMessage() {
     messageInput.value = "";
     messageInput.style.height = "auto";
     sendBtn.disabled = true;
-    setStatus(`Thinking with ${selectedModel}`, true);
+    setStatus(`Thinking with ${modelLabel(selectedModel)}`, true);
 
     const likelyTool = detectLikelyTool(message);
     let toolProgress = null;
@@ -1991,7 +1999,7 @@ async function sendMessage() {
                 firstTokenReceived = true;
                 botElement.innerHTML = "";
                 if (likelyTool && toolProgress) completeToolProgress(toolProgress, likelyTool);
-                setStatus(`Generating with ${selectedModel}`, true);
+                setStatus(`Generating with ${modelLabel(selectedModel)}`, true);
             }
             accumulated += data.token;
             botElement.textContent = accumulated;

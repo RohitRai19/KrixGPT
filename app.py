@@ -37,6 +37,7 @@ from database import (
     count_messages)
 
 from titles import generate_title
+from providers import model_groups, default_model
 
 from auth import (
     SESSION_COOKIE_NAME,
@@ -94,6 +95,8 @@ async def home(request: Request):
         context={
             "firebase_config": json.dumps(FIREBASE_WEB_CONFIG),
             "current_user": get_optional_user(request),
+            "model_groups": model_groups(),
+            "default_model": default_model(),
         }
     )
 
