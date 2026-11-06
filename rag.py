@@ -56,6 +56,36 @@ def read_file_text(file_path: str) -> str:
     raise ValueError("Unsupported file type. Upload PDF, DOCX, TXT, MD, PY, or CSV.")
 
 
+def add_document_to_rag(file_path: str, thread_id: str):
+    text = read_file_text(file_path)
+
+    if not text.strip():
+        raise ValueError("No text could be extracted from this file.")
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=900,
+        chunk_overlap=150
+    )
+
+    chunks = splitter.split_text(text)
+
+    docs: List[Document] = [
+        Document(
+            page_content=chunk,
+            metadata={
+                "thread_id": thread_id,
+                "source": Path(file_path).name
+            }
+        )
+        for chunk in chunks
+    ]
+
+    vectorstore.add_documents(docs)
+
+    return {
+        "filename": Path(file_path).name,
+        "chunks": len(docs)
+    }
 
 
 

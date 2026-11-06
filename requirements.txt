@@ -18,3 +18,7 @@ docx2txt==0.9
 langchain-tavily==0.2.18
 tavily-python==0.7.24
 sqlalchemy==2.0.50
+
+firebase-admin==7.7.0
+itsdangerous==2.2.0
+google-auth==2.62.1

@@ -1,8 +1,9 @@
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.exc import OperationalError
 
 Path("data").mkdir(exist_ok=True)
 
@@ -22,6 +23,7 @@ class Conversation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     thread_id = Column(String, unique=True, index=True)
+    user_id = Column(String, index=True, nullable=True)
     title = Column(String, default="New Chat")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
@@ -48,9 +50,30 @@ class LongTermMemory(Base):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _migrate()
 
 
-def create_or_update_conversation(thread_id: str, first_message: str | None = None):
+def _migrate():
+    """Add columns introduced after the first release to existing SQLite files."""
+    inspector = inspect(engine)
+    columns = {c["name"] for c in inspector.get_columns("conversations")}
+
+    if "user_id" not in columns:
+        with engine.begin() as conn:
+            try:
+                conn.execute(text("ALTER TABLE conversations ADD COLUMN user_id VARCHAR"))
+            except OperationalError as exc:
+                # Another process (e.g. uvicorn --reload) migrated first.
+                if "duplicate column" not in str(exc).lower():
+                    raise
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_conversations_user_id ON conversations (user_id)"))
+
+
+def create_or_update_conversation(
+    thread_id: str,
+    first_message: str | None = None,
+    user_id: str | None = None
+):
     db = SessionLocal()
 
     try:
@@ -59,6 +82,9 @@ def create_or_update_conversation(thread_id: str, first_message: str | None = No
             .filter(Conversation.thread_id == thread_id)
             .first()
         )
+
+        if conversation and user_id and conversation.user_id and conversation.user_id != user_id:
+            raise PermissionError("This conversation belongs to another user.")
 
         if not conversation:
             title = "New Chat"
@@ -70,6 +96,7 @@ def create_or_update_conversation(thread_id: str, first_message: str | None = No
 
             conversation = Conversation(
                 thread_id=thread_id,
+                user_id=user_id,
                 title=title,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
@@ -79,6 +106,8 @@ def create_or_update_conversation(thread_id: str, first_message: str | None = No
 
         else:
             conversation.updated_at = datetime.utcnow()
+            if user_id and not conversation.user_id:
+                conversation.user_id = user_id
 
         db.commit()
 
@@ -86,15 +115,16 @@ def create_or_update_conversation(thread_id: str, first_message: str | None = No
         db.close()
 
 
-def list_conversations():
+def list_conversations(user_id: str | None = None):
     db = SessionLocal()
 
     try:
-        return (
-            db.query(Conversation)
-            .order_by(Conversation.updated_at.desc())
-            .all()
-        )
+        query = db.query(Conversation)
+
+        if user_id is not None:
+            query = query.filter(Conversation.user_id == user_id)
+
+        return query.order_by(Conversation.updated_at.desc()).all()
 
     finally:
         db.close()
@@ -123,6 +153,22 @@ def save_chat_message(thread_id: str, role: str, content: str):
             conversation.updated_at = datetime.utcnow()
 
         db.commit()
+
+    finally:
+        db.close()
+
+
+def conversation_owner(thread_id: str) -> str | None:
+    """Return the owning user_id, or None if the conversation is missing/unowned."""
+    db = SessionLocal()
+
+    try:
+        conversation = (
+            db.query(Conversation)
+            .filter(Conversation.thread_id == thread_id)
+            .first()
+        )
+        return conversation.user_id if conversation else None
 
     finally:
         db.close()
