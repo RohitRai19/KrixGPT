@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+.vscode
+__pycache__
+*.pyc
+.env
+data
+chroma_db
+uploads
+*.sqlite
+*.db
+README.md
