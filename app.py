@@ -446,8 +446,16 @@ try:
         @spaces.GPU(duration=1)
         def _zero_gpu_placeholder() -> str:
             return "KrixGPT runs its models via provider APIs; no GPU work here."
-    except Exception:
-        pass
+
+        # `spaces` normally reports the decorated functions to ZeroGPU from a
+        # patched gr.Blocks.launch(). We serve through uvicorn and never call
+        # launch(), so send that startup report ourselves.
+        _zero_startup = getattr(getattr(spaces, "zero", None), "startup", None)
+        if callable(_zero_startup):
+            _zero_startup()
+            print("ZeroGPU startup report sent (placeholder GPU function registered).")
+    except Exception as _spaces_exc:
+        print(f"ZeroGPU setup skipped: {type(_spaces_exc).__name__}: {_spaces_exc}")
 
     with gr.Blocks(title="KrixGPT") as _gradio_demo:
         gr.Markdown("## KrixGPT - the full chat UI is served at the site root: [Open KrixGPT](/)")
