@@ -428,11 +428,29 @@ async def chat_stream(request: Request, user: dict | None = Depends(get_optional
 
 
 
+# ---------------------------------------------------------------------------
+# Hugging Face Spaces (free "Gradio" SDK) runs app.py and expects a Gradio app
+# on port 7860. Gradio is built on FastAPI, so we mount a tiny Gradio page at
+# /gradio and keep serving the real UI at "/". Locally this is harmless.
+# ---------------------------------------------------------------------------
+try:
+    import gradio as gr
+
+    with gr.Blocks(title="KrixGPT") as _gradio_demo:
+        gr.Markdown("## KrixGPT - the full chat UI is served at the site root: [Open KrixGPT](/)")
+
+    app = gr.mount_gradio_app(app, _gradio_demo, path="/gradio")
+except ImportError:
+    pass
+
+
 if __name__ == "__main__":
-   
+    on_spaces = bool(os.getenv("SPACE_ID"))
+    port = int(os.getenv("PORT") or os.getenv("GRADIO_SERVER_PORT") or (7860 if on_spaces else 8080))
+
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
-        port=8080,
-        reload=True
+        port=port,
+        reload=not on_spaces,
     )

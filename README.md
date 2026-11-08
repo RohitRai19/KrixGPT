@@ -3,8 +3,10 @@ title: KrixGPT
 emoji: 🤖
 colorFrom: indigo
 colorTo: purple
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: 6.31.0
+python_version: "3.11"
+app_file: app.py
 pinned: false
 ---
 
@@ -36,30 +38,29 @@ Endpoints: `POST /auth/login {idToken}`, `POST /auth/logout`, `GET /auth/me`.
 
 ## Deploy for free on Hugging Face Spaces
 
-The repo already contains a `Dockerfile` and the Space header at the top of this
-README, so a Space can be created straight from GitHub.
+Docker Spaces are a paid feature on Hugging Face, so the free route is a
+**Gradio** Space. Gradio is built on FastAPI, so `app.py` mounts a tiny Gradio
+page at `/gradio` and keeps serving the real UI at `/`. The README header above
+tells Spaces how to run it (Python 3.11, `app.py`, port 7860).
 
-1. Create a Space at https://huggingface.co/new-space: pick **Docker** as the SDK,
-   **Blank** template, **CPU basic (free)** hardware, Public visibility.
-2. Connect it to this GitHub repository (Space settings -> "Sync with GitHub"),
-   or push this repo to the Space's git remote:
+1. Create a Space at https://huggingface.co/new-space: SDK **Gradio**, template
+   **Blank**, hardware **CPU basic (free)**, visibility Public.
+2. Push this repo to the Space:
    `git remote add space https://huggingface.co/spaces/<user>/<space>` then
-   `git push space main`.
-3. In the Space settings, under **Variables and secrets**, add these **secrets**:
-   `GROQ_API_KEY`, `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `SESSION_SECRET`
-   (any long random string), `LANGSMITH_API_KEY` (optional).
-   Add these as plain **variables**: `LANGSMITH_TRACING=true`,
-   `LANGSMITH_PROJECT=KrixGPT`, and the `FIREBASE_*` values (API key, auth domain, project id,
-   storage bucket, messaging sender id, app id, measurement id) from your Firebase web app settings.
-4. In Firebase Console -> Authentication -> Settings -> Authorized domains, add
-   `<user>-<space>.hf.space` so Google sign-in works on the live site.
-5. Open the app at `https://<user>-<space>.hf.space` (the direct URL, not the
-   huggingface.co page, which embeds the app in an iframe that blocks the
-   sign-in popup).
+   `git push space main` (username + a *write* access token as the password).
+3. Space **Settings -> Variables and secrets**. Secrets: `GROQ_API_KEY`,
+   `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `SESSION_SECRET`, and the seven
+   `FIREBASE_*` values from `.env`; optional `LANGSMITH_API_KEY`.
+   Variables: `LANGSMITH_TRACING=true`, `LANGSMITH_PROJECT=KrixGPT`.
+4. Firebase Console -> Authentication -> Settings -> Authorized domains: add
+   `<user>-<space>.hf.space`.
+5. Open `https://<user>-<space>.hf.space` (the direct URL; the huggingface.co
+   page embeds the app in an iframe that blocks the sign-in popup).
 
-Notes: the free tier's disk is reset whenever the Space is rebuilt, so chats,
-memories and uploads persist between visits but not across redeploys. Guests can
-use the app without signing in.
+Notes: the free tier's disk resets on rebuild, so chats, memories and uploads
+persist between visits but not across redeploys. Guests can chat without
+signing in. The `Dockerfile` still works for paid Docker Spaces or any other
+container host.
 
 ## Run locally with Docker
 
