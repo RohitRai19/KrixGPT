@@ -28,3 +28,4 @@ requests==2.34.2
 
 # Hugging Face Spaces free tier (Gradio SDK) host shim
 gradio==6.31.0
+spaces==0.51.3

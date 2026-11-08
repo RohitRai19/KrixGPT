@@ -38,13 +38,16 @@ Endpoints: `POST /auth/login {idToken}`, `POST /auth/logout`, `GET /auth/me`.
 
 ## Deploy for free on Hugging Face Spaces
 
-Docker Spaces are a paid feature on Hugging Face, so the free route is a
-**Gradio** Space. Gradio is built on FastAPI, so `app.py` mounts a tiny Gradio
-page at `/gradio` and keeps serving the real UI at `/`. The README header above
-tells Spaces how to run it (Python 3.11, `app.py`, port 7860).
+On Hugging Face's current free plan, Docker Spaces and CPU-basic Gradio Spaces
+need a PRO subscription; the free hardware for app Spaces is **ZeroGPU**. KrixGPT
+needs no GPU (every model is an API call), so `app.py` declares a never-called
+`@spaces.GPU` placeholder to satisfy the tier, mounts a tiny Gradio page at
+`/gradio`, and keeps serving the real UI at `/`. The README header above tells
+Spaces how to run it (Python 3.11, `app.py`, port 7860).
 
 1. Create a Space at https://huggingface.co/new-space: SDK **Gradio**, template
-   **Blank**, hardware **CPU basic (free)**, visibility Public.
+   **Blank**, hardware **ZeroGPU** (free), visibility Public. Or from Python:
+   `HfApi().create_repo("<user>/<space>", repo_type="space", space_sdk="gradio", space_hardware="zero-a10g")`.
 2. Push this repo to the Space:
    `git remote add space https://huggingface.co/spaces/<user>/<space>` then
    `git push space main` (username + a *write* access token as the password).
