@@ -465,9 +465,31 @@ except ImportError:
     pass
 
 
+def _pick_port(candidates: list[int]) -> int:
+    """First candidate port that is free (Spaces may already hold 7860 itself)."""
+    import socket
+
+    for port in candidates:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("0.0.0.0", port))
+                return port
+            except OSError:
+                print(f"Port {port} is busy, trying the next one.")
+    return candidates[-1]
+
+
 if __name__ == "__main__":
     on_spaces = bool(os.getenv("SPACE_ID"))
-    port = int(os.getenv("PORT") or os.getenv("GRADIO_SERVER_PORT") or (7860 if on_spaces else 8080))
+
+    env_port = [int(v) for v in (os.getenv("GRADIO_SERVER_PORT"), os.getenv("PORT")) if v and v.isdigit()]
+    candidates = env_port + ([7860, 7861, 7862, 8000] if on_spaces else [8080])
+    port = _pick_port(list(dict.fromkeys(candidates)))
+
+    if on_spaces:
+        print("Spaces env:", {k: os.getenv(k) for k in ("SPACE_ID", "PORT", "GRADIO_SERVER_PORT", "SPACES_ZERO_GPU", "SYSTEM")},
+              "| binding port:", port)
 
     uvicorn.run(
         "app:app",
