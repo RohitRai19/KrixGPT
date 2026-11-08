@@ -1,0 +1,24 @@
+# Local Docker run: `docker compose up --build`, then open http://localhost:8080
+services:
+  krixgpt:
+    build: .
+    image: krixgpt:local
+    container_name: krixgpt
+    ports:
+      - "8080:7860"          # host:container (the app listens on 7860 inside)
+    env_file:
+      - .env                 # API keys and SESSION_SECRET; never baked into the image
+    environment:
+      - PORT=7860
+    volumes:
+      # Keep chats, memory, vector index and uploads across container restarts.
+      - ./data:/app/data
+      - ./chroma_db:/app/chroma_db
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:7860/')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s

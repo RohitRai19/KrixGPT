@@ -59,3 +59,13 @@ README, so a Space can be created straight from GitHub.
 Notes: the free tier's disk is reset whenever the Space is rebuilt, so chats,
 memories and uploads persist between visits but not across redeploys. Guests can
 use the app without signing in.
+
+## Run locally with Docker
+
+```bash
+docker compose up --build
+```
+
+Then open http://localhost:8080. The container reads keys from `.env` and keeps
+`data/`, `chroma_db/` and `uploads/` on your disk, so chats and memory survive
+restarts. Stop with `Ctrl+C` or `docker compose down`.
