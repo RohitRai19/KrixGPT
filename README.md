@@ -29,7 +29,7 @@ Environment variables (`.env`):
 | Variable | Required | Purpose |
 |---|---|---|
 | `SESSION_SECRET` | recommended | Signs the session cookie. If unset a random secret is used and all users are logged out on every restart. |
-| `FIREBASE_PROJECT_ID` | no | Defaults to `raiyronai`. Other `FIREBASE_*` web-config values can be overridden the same way (see `FIREBASE_WEB_CONFIG` in `app.py`). |
+| `FIREBASE_PROJECT_ID` | yes | Your Firebase project id. The other `FIREBASE_*` web-config values (`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID`, `FIREBASE_MEASUREMENT_ID`) are read from the environment too; without `FIREBASE_API_KEY` sign-in is disabled and the app runs in guest mode. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | no | Path to a Firebase service-account JSON. When set, tokens are verified with the Admin SDK and revoked tokens are rejected. Without it, tokens are verified against Google's public certificates. |
 
 Endpoints: `POST /auth/login {idToken}`, `POST /auth/logout`, `GET /auth/me`.
@@ -49,7 +49,8 @@ README, so a Space can be created straight from GitHub.
    `GROQ_API_KEY`, `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `SESSION_SECRET`
    (any long random string), `LANGSMITH_API_KEY` (optional).
    Add these as plain **variables**: `LANGSMITH_TRACING=true`,
-   `LANGSMITH_PROJECT=KrixGPT`, and the `FIREBASE_*` values from `app.py`.
+   `LANGSMITH_PROJECT=KrixGPT`, and the `FIREBASE_*` values (API key, auth domain, project id,
+   storage bucket, messaging sender id, app id, measurement id) from your Firebase web app settings.
 4. In Firebase Console -> Authentication -> Settings -> Authorized domains, add
    `<user>-<space>.hf.space` so Google sign-in works on the live site.
 5. Open the app at `https://<user>-<space>.hf.space` (the direct URL, not the

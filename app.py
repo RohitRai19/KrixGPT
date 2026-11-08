@@ -63,15 +63,22 @@ Path("data").mkdir(exist_ok=True)
 init_db()
 
 
-FIREBASE_WEB_CONFIG = {
-    "apiKey": os.getenv("FIREBASE_API_KEY", "AIzaSyBUV_BZju0ffdtMJ79-hSiOsjLb0rzVRSA"),
-    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN", "raiyronai.firebaseapp.com"),
-    "projectId": os.getenv("FIREBASE_PROJECT_ID", "raiyronai"),
-    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET", "raiyronai.firebasestorage.app"),
-    "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID", "760542218753"),
-    "appId": os.getenv("FIREBASE_APP_ID", "1:760542218753:web:ebfb23af2de8ace3b0ce00"),
-    "measurementId": os.getenv("FIREBASE_MEASUREMENT_ID", "G-XX45XZ6DXE"),
+# Firebase web config: public identifiers shipped to every browser, but kept in
+# the environment so they can be rotated without a code change. If the API key
+# is missing, the UI shows "Sign-in is not configured" and guest chat still works.
+_FIREBASE_ENV = {
+    "apiKey": "FIREBASE_API_KEY",
+    "authDomain": "FIREBASE_AUTH_DOMAIN",
+    "projectId": "FIREBASE_PROJECT_ID",
+    "storageBucket": "FIREBASE_STORAGE_BUCKET",
+    "messagingSenderId": "FIREBASE_MESSAGING_SENDER_ID",
+    "appId": "FIREBASE_APP_ID",
+    "measurementId": "FIREBASE_MEASUREMENT_ID",
 }
+FIREBASE_WEB_CONFIG = {k: v for k, v in ((k, os.getenv(env, "").strip()) for k, env in _FIREBASE_ENV.items()) if v}
+
+if not FIREBASE_WEB_CONFIG.get("apiKey"):
+    print("WARNING: FIREBASE_API_KEY not set; Google sign-in is disabled (guest mode only).")
 
 
 def _ensure_owner(thread_id: str, user: dict | None):

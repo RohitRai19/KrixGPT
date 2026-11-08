@@ -21,7 +21,7 @@ from google.oauth2 import id_token as google_id_token
 from fastapi import HTTPException, Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "raiyronai")
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
 
 SESSION_COOKIE_NAME = "krix_session"
 SESSION_MAX_AGE_SECONDS = int(os.getenv("SESSION_MAX_AGE_SECONDS", str(14 * 24 * 60 * 60)))
