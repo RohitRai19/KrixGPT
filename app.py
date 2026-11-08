@@ -429,17 +429,23 @@ async def chat_stream(request: Request, user: dict | None = Depends(get_optional
 
 
 # ---------------------------------------------------------------------------
-# Hugging Face Spaces (free "Gradio" SDK) runs app.py and expects a Gradio app
-# on port 7860. Gradio is built on FastAPI, so we mount a tiny Gradio page at
-# /gradio and keep serving the real UI at "/". Locally this is harmless.
+# Hugging Face Spaces (Gradio SDK, free ZeroGPU tier)
+#
+# Spaces imports this file and launches the Gradio Blocks it finds, binding
+# port 7860 itself. Gradio is built on FastAPI, so when that launch happens we
+# let Gradio create its server, then swap its root page for the whole KrixGPT
+# FastAPI app. Result: the real UI at "/", Gradio's own endpoints untouched.
+# Locally none of this triggers; `python app.py` serves on 8080 with uvicorn.
 # ---------------------------------------------------------------------------
+ON_SPACES = bool(os.getenv("SPACE_ID"))
+
 try:
     import gradio as gr
 
-    # Hugging Face's free "ZeroGPU" tier only accepts apps that declare at least
-    # one @spaces.GPU function. KrixGPT needs no GPU (all models are API calls),
-    # so this placeholder satisfies the check and is never invoked. Harmless
-    # elsewhere: the import fails outside Spaces and the block is skipped.
+    # ZeroGPU only accepts apps that declare a @spaces.GPU function. KrixGPT
+    # needs no GPU (all models are API calls), so this placeholder is never
+    # invoked. `spaces` normally reports it from a patched launch(); we also
+    # send the report ourselves in case we are served without launch().
     try:
         import spaces
 
@@ -447,9 +453,6 @@ try:
         def _zero_gpu_placeholder() -> str:
             return "KrixGPT runs its models via provider APIs; no GPU work here."
 
-        # `spaces` normally reports the decorated functions to ZeroGPU from a
-        # patched gr.Blocks.launch(). We serve through uvicorn and never call
-        # launch(), so send that startup report ourselves.
         _zero_startup = getattr(getattr(spaces, "zero", None), "startup", None)
         if callable(_zero_startup):
             _zero_startup()
@@ -460,40 +463,44 @@ try:
     with gr.Blocks(title="KrixGPT") as _gradio_demo:
         gr.Markdown("## KrixGPT - the full chat UI is served at the site root: [Open KrixGPT](/)")
 
-    app = gr.mount_gradio_app(app, _gradio_demo, path="/gradio")
+    def _attach_krixgpt(gradio_app) -> None:
+        """Serve the KrixGPT FastAPI app at the root of a launched Gradio server."""
+        routes = gradio_app.router.routes
+        routes[:] = [r for r in routes if getattr(r, "path", None) != "/"]
+        gradio_app.mount("/", app)
+        print("KrixGPT mounted at the root of the Gradio server.")
+
+    _original_launch = _gradio_demo.launch
+
+    def _launch_with_krixgpt(*args, **kwargs):
+        blocking = not kwargs.get("prevent_thread_lock", False)
+        kwargs["prevent_thread_lock"] = True
+        gradio_app, local_url, share_url = _original_launch(*args, **kwargs)
+        _attach_krixgpt(gradio_app)
+        print(f"KrixGPT is live behind Gradio at {local_url}")
+        if blocking:
+            _gradio_demo.block_thread()
+        return gradio_app, local_url, share_url
+
+    _gradio_demo.launch = _launch_with_krixgpt
+
+    if not ON_SPACES:
+        # Local parity: expose the small Gradio page under /gradio.
+        app = gr.mount_gradio_app(app, _gradio_demo, path="/gradio")
 except ImportError:
-    pass
-
-
-def _pick_port(candidates: list[int]) -> int:
-    """First candidate port that is free (Spaces may already hold 7860 itself)."""
-    import socket
-
-    for port in candidates:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            try:
-                s.bind(("0.0.0.0", port))
-                return port
-            except OSError:
-                print(f"Port {port} is busy, trying the next one.")
-    return candidates[-1]
+    _gradio_demo = None
 
 
 if __name__ == "__main__":
-    on_spaces = bool(os.getenv("SPACE_ID"))
-
-    env_port = [int(v) for v in (os.getenv("GRADIO_SERVER_PORT"), os.getenv("PORT")) if v and v.isdigit()]
-    candidates = env_port + ([7860, 7861, 7862, 8000] if on_spaces else [8080])
-    port = _pick_port(list(dict.fromkeys(candidates)))
-
-    if on_spaces:
+    if ON_SPACES and _gradio_demo is not None:
+        port = int(os.getenv("GRADIO_SERVER_PORT") or os.getenv("PORT") or 7860)
         print("Spaces env:", {k: os.getenv(k) for k in ("SPACE_ID", "PORT", "GRADIO_SERVER_PORT", "SPACES_ZERO_GPU", "SYSTEM")},
-              "| binding port:", port)
-
-    uvicorn.run(
-        "app:app",
-        host="0.0.0.0",
-        port=port,
-        reload=not on_spaces,
-    )
+              "| launching via Gradio on port", port)
+        _gradio_demo.launch(server_name="0.0.0.0", server_port=port)
+    else:
+        uvicorn.run(
+            "app:app",
+            host="0.0.0.0",
+            port=int(os.getenv("PORT") or 8080),
+            reload=True,
+        )
