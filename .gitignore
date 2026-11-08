@@ -223,3 +223,6 @@ __marimo__/
 data/
 chroma_db/
 uploads/
+
+# Local documents (interview guide etc.)
+docs/
