@@ -24,6 +24,23 @@ Environment variables (`.env`):
 
 Endpoints: `POST /auth/login {idToken}`, `POST /auth/logout`, `GET /auth/me`.
 
+## Live demo (Render, free)
+
+The app is deployed at **https://krixgpt.onrender.com** from the Docker Hub image
+`rohitrai1904/krixgpt:latest`. Render's free plan sleeps after 15 minutes without
+visitors (first request then takes ~50 s) and has no persistent disk, so chats,
+memories and uploads reset on redeploy; fine for demos.
+
+Deploy steps (Render dashboard): New -> Web Service -> **Existing Image** ->
+`docker.io/rohitrai1904/krixgpt:latest` -> instance type **Free** -> add the
+environment variables (`GROQ_API_KEY`, `GOOGLE_API_KEY`, `TAVILY_API_KEY`,
+`SESSION_SECRET`, the seven `FIREBASE_*` values, `LANGSMITH_*`, `PORT=7860`) ->
+Health Check Path `/` -> Deploy. Then add the `onrender.com` hostname under
+Firebase -> Authentication -> Settings -> Authorized domains.
+
+To ship an update: build and push a new image (see below), then click
+**Manual Deploy -> Deploy latest reference** on the Render service.
+
 ## Deploy on AWS Free Tier (EC2 + Docker)
 
 The app ships as a Docker image (see `Dockerfile`). The AWS Free Tier gives a
