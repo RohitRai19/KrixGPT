@@ -1,0 +1,7 @@
+# Overlay: run the published Docker Hub image instead of building locally.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hub.yml up -d
+services:
+  krixgpt:
+    build: !reset null
+    image: rohitrai1904/krixgpt:latest
+    pull_policy: always

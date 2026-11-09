@@ -64,12 +64,22 @@ DOMAIN=krixgpt.duckdns.org
 ```
 
 ### 5. Start it with HTTPS
+The image is published on Docker Hub as `rohitrai1904/krixgpt:latest`, so the
+server pulls it instead of building (a build on a 1 GB instance takes ~10 min):
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hub.yml up -d
 ```
 `docker-compose.prod.yml` adds a Caddy reverse proxy that obtains and renews a
 free Let's Encrypt certificate for `DOMAIN` automatically and forwards traffic
-to the app. First start takes a few minutes (image build + certificate).
+to the app; `docker-compose.hub.yml` swaps the local build for the Docker Hub
+image. First start takes a minute or two (image pull + certificate).
+
+To publish a new image after code changes (from your PC):
+```bash
+docker compose build
+docker tag krixgpt:local rohitrai1904/krixgpt:latest
+docker push rohitrai1904/krixgpt:latest
+```
 
 ### 6. Allow Google sign-in from the new domain
 Firebase Console -> Authentication -> Settings -> Authorized domains -> add
@@ -77,7 +87,7 @@ Firebase Console -> Authentication -> Settings -> Authorized domains -> add
 
 ### Updating
 ```bash
-cd ~/KrixGPT && git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+cd ~/KrixGPT && git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hub.yml pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hub.yml up -d
 ```
 
 Notes: data (SQLite, Chroma index, uploads) lives in bind-mounted folders on the
