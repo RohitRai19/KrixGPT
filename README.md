@@ -1,15 +1,3 @@
----
-title: KrixGPT
-emoji: 🤖
-colorFrom: indigo
-colorTo: purple
-sdk: gradio
-sdk_version: 6.31.0
-python_version: "3.11"
-app_file: app.py
-pinned: false
----
-
 # KrixGPT
 
 ## Authentication (Google sign-in via Firebase)
@@ -36,34 +24,66 @@ Environment variables (`.env`):
 
 Endpoints: `POST /auth/login {idToken}`, `POST /auth/logout`, `GET /auth/me`.
 
-## Deploy for free on Hugging Face Spaces
+## Deploy on AWS Free Tier (EC2 + Docker)
 
-On Hugging Face's current free plan, Docker Spaces and CPU-basic Gradio Spaces
-need a PRO subscription; the free hardware for app Spaces is **ZeroGPU**. KrixGPT
-needs no GPU (every model is an API call), so `app.py` declares a never-called
-`@spaces.GPU` placeholder to satisfy the tier, mounts a tiny Gradio page at
-`/gradio`, and keeps serving the real UI at `/`. The README header above tells
-Spaces how to run it (Python 3.11, `app.py`, port 7860).
+The app ships as a Docker image (see `Dockerfile`). The AWS Free Tier gives a
+small EC2 instance free for 12 months, which is enough for a demo.
 
-1. Create a Space at https://huggingface.co/new-space: SDK **Gradio**, template
-   **Blank**, hardware **ZeroGPU** (free), visibility Public. Or from Python:
-   `HfApi().create_repo("<user>/<space>", repo_type="space", space_sdk="gradio", space_hardware="zero-a10g")`.
-2. Push this repo to the Space:
-   `git remote add space https://huggingface.co/spaces/<user>/<space>` then
-   `git push space main` (username + a *write* access token as the password).
-3. Space **Settings -> Variables and secrets**. Secrets: `GROQ_API_KEY`,
-   `GOOGLE_API_KEY`, `TAVILY_API_KEY`, `SESSION_SECRET`, and the seven
-   `FIREBASE_*` values from `.env`; optional `LANGSMITH_API_KEY`.
-   Variables: `LANGSMITH_TRACING=true`, `LANGSMITH_PROJECT=KrixGPT`.
-4. Firebase Console -> Authentication -> Settings -> Authorized domains: add
-   `<user>-<space>.hf.space`.
-5. Open `https://<user>-<space>.hf.space` (the direct URL; the huggingface.co
-   page embeds the app in an iframe that blocks the sign-in popup).
+### 1. Launch the instance
+- EC2 -> Launch instance. AMI: **Ubuntu Server 24.04 LTS**. Type: **t3.micro**
+  (or t2.micro) - the Free Tier eligible size. Create/download a key pair.
+- Storage: 20 GB gp3 (Free Tier allows up to 30 GB).
+- Security group inbound rules: SSH 22 (your IP), HTTP 80 and HTTPS 443 (anywhere).
+- Note the public IPv4 address after launch. Allocate an **Elastic IP** and
+  associate it so the address survives restarts.
 
-Notes: the free tier's disk resets on rebuild, so chats, memories and uploads
-persist between visits but not across redeploys. Guests can chat without
-signing in. The `Dockerfile` still works for paid Docker Spaces or any other
-container host.
+### 2. Point a free domain at it
+Google sign-in requires HTTPS, and HTTPS requires a hostname. Create a free
+subdomain at https://www.duckdns.org (e.g. `krixgpt.duckdns.org`) and set its IP
+to the Elastic IP.
+
+### 3. Install Docker on the instance
+```bash
+ssh -i your-key.pem ubuntu@<elastic-ip>
+sudo apt-get update && sudo apt-get install -y ca-certificates curl git
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker ubuntu && newgrp docker
+# 1 GB of RAM is tight for ChromaDB + LangChain: add swap so the app never OOMs
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+### 4. Get the code and secrets onto the server
+```bash
+git clone https://github.com/RohitRai19/KrixGPT.git && cd KrixGPT
+nano .env        # paste the same keys as your local .env (never commit this file)
+```
+Add one more line to `.env` with your domain, used by the HTTPS proxy:
+```
+DOMAIN=krixgpt.duckdns.org
+```
+
+### 5. Start it with HTTPS
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+`docker-compose.prod.yml` adds a Caddy reverse proxy that obtains and renews a
+free Let's Encrypt certificate for `DOMAIN` automatically and forwards traffic
+to the app. First start takes a few minutes (image build + certificate).
+
+### 6. Allow Google sign-in from the new domain
+Firebase Console -> Authentication -> Settings -> Authorized domains -> add
+`krixgpt.duckdns.org`. Then open `https://krixgpt.duckdns.org`.
+
+### Updating
+```bash
+cd ~/KrixGPT && git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Notes: data (SQLite, Chroma index, uploads) lives in bind-mounted folders on the
+instance disk and survives restarts and redeploys. Free Tier covers 750 hours a
+month of one micro instance for 12 months; after that a t3.micro is roughly
+$8/month, or stop the instance when not demoing.
 
 ## Run locally with Docker
 

@@ -428,79 +428,11 @@ async def chat_stream(request: Request, user: dict | None = Depends(get_optional
 
 
 
-# ---------------------------------------------------------------------------
-# Hugging Face Spaces (Gradio SDK, free ZeroGPU tier)
-#
-# Spaces imports this file and launches the Gradio Blocks it finds, binding
-# port 7860 itself. Gradio is built on FastAPI, so when that launch happens we
-# let Gradio create its server, then swap its root page for the whole KrixGPT
-# FastAPI app. Result: the real UI at "/", Gradio's own endpoints untouched.
-# Locally none of this triggers; `python app.py` serves on 8080 with uvicorn.
-# ---------------------------------------------------------------------------
-ON_SPACES = bool(os.getenv("SPACE_ID"))
-
-try:
-    import gradio as gr
-
-    # ZeroGPU only accepts apps that declare a @spaces.GPU function. KrixGPT
-    # needs no GPU (all models are API calls), so this placeholder is never
-    # invoked. `spaces` normally reports it from a patched launch(); we also
-    # send the report ourselves in case we are served without launch().
-    try:
-        import spaces
-
-        @spaces.GPU(duration=1)
-        def _zero_gpu_placeholder() -> str:
-            return "KrixGPT runs its models via provider APIs; no GPU work here."
-
-        _zero_startup = getattr(getattr(spaces, "zero", None), "startup", None)
-        if callable(_zero_startup):
-            _zero_startup()
-            print("ZeroGPU startup report sent (placeholder GPU function registered).")
-    except Exception as _spaces_exc:
-        print(f"ZeroGPU setup skipped: {type(_spaces_exc).__name__}: {_spaces_exc}")
-
-    with gr.Blocks(title="KrixGPT") as _gradio_demo:
-        gr.Markdown("## KrixGPT - the full chat UI is served at the site root: [Open KrixGPT](/)")
-
-    def _attach_krixgpt(gradio_app) -> None:
-        """Serve the KrixGPT FastAPI app at the root of a launched Gradio server."""
-        routes = gradio_app.router.routes
-        routes[:] = [r for r in routes if getattr(r, "path", None) != "/"]
-        gradio_app.mount("/", app)
-        print("KrixGPT mounted at the root of the Gradio server.")
-
-    _original_launch = _gradio_demo.launch
-
-    def _launch_with_krixgpt(*args, **kwargs):
-        blocking = not kwargs.get("prevent_thread_lock", False)
-        kwargs["prevent_thread_lock"] = True
-        gradio_app, local_url, share_url = _original_launch(*args, **kwargs)
-        _attach_krixgpt(gradio_app)
-        print(f"KrixGPT is live behind Gradio at {local_url}")
-        if blocking:
-            _gradio_demo.block_thread()
-        return gradio_app, local_url, share_url
-
-    _gradio_demo.launch = _launch_with_krixgpt
-
-    if not ON_SPACES:
-        # Local parity: expose the small Gradio page under /gradio.
-        app = gr.mount_gradio_app(app, _gradio_demo, path="/gradio")
-except ImportError:
-    _gradio_demo = None
-
-
 if __name__ == "__main__":
-    if ON_SPACES and _gradio_demo is not None:
-        port = int(os.getenv("GRADIO_SERVER_PORT") or os.getenv("PORT") or 7860)
-        print("Spaces env:", {k: os.getenv(k) for k in ("SPACE_ID", "PORT", "GRADIO_SERVER_PORT", "SPACES_ZERO_GPU", "SYSTEM")},
-              "| launching via Gradio on port", port)
-        _gradio_demo.launch(server_name="0.0.0.0", server_port=port)
-    else:
-        uvicorn.run(
-            "app:app",
-            host="0.0.0.0",
-            port=int(os.getenv("PORT") or 8080),
-            reload=True,
-        )
+    # Local development only; containers start uvicorn directly (see Dockerfile).
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT") or 8080),
+        reload=True,
+    )

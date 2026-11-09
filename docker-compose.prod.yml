@@ -1,0 +1,28 @@
+# Production overlay: adds a Caddy reverse proxy with automatic HTTPS.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Requires DOMAIN=<your hostname> in .env (e.g. krixgpt.duckdns.org) pointing at this server.
+services:
+  krixgpt:
+    ports: !override []          # only Caddy is exposed to the internet
+    expose:
+      - "7860"
+
+  caddy:
+    image: caddy:2.9.1-alpine
+    container_name: krixgpt-caddy
+    restart: unless-stopped
+    depends_on:
+      - krixgpt
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?Set DOMAIN in .env, e.g. krixgpt.duckdns.org}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # certificates
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

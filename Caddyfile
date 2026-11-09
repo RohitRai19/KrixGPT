@@ -1,0 +1,10 @@
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy krixgpt:7860 {
+		# Server-Sent Events: stream tokens through without buffering.
+		flush_interval -1
+		transport http {
+			read_timeout 10m
+		}
+	}
+}
