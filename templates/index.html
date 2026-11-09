@@ -1010,6 +1010,81 @@ textarea:focus-visible,
     .top-signin { padding: 7px 9px; }
 }
 
+/* ---------- Empty state: ChatGPT-style centered composer ---------- */
+.main.empty .chat-container {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+    padding-bottom: 0;
+}
+
+.main.empty .welcome { padding: 0 8px 22px; }
+
+.main.empty .input-area {
+    flex: 1 1 0;
+    background: none;
+    padding-top: 0;
+}
+
+/* ---------- Typed suggestions ---------- */
+.input-wrapper { position: relative; }
+
+.suggest-box {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    display: none;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 30;
+}
+
+.suggest-box.show { display: block; }
+
+.suggest-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    padding: 9px 10px;
+    border-radius: 9px;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.35;
+}
+
+.suggest-item:hover,
+.suggest-item.active { background: var(--bg-elev-2); }
+
+.suggest-item svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--text-muted);
+}
+
+.suggest-item .suggest-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suggest-item mark { background: none; color: var(--accent); font-weight: 600; }
+.suggest-item .suggest-tag { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+
+@media (max-width: 480px) {
+    .suggest-item .suggest-tag { display: none; }
+}
+
 /* ---------- Toast ---------- */
 .toast {
     position: fixed;
@@ -1173,12 +1248,13 @@ textarea:focus-visible,
 
         <div class="input-area">
             <div class="input-wrapper">
+                <div class="suggest-box" id="suggestBox" role="listbox" aria-label="Suggestions"></div>
                 <label for="messageInput" class="sr-only">Message</label>
                 <textarea
                     id="messageInput"
                     placeholder="Ask anything..."
                     rows="1"
-                    oninput="autoResize(this)"
+                    oninput="onComposerInput(this)"
                     onkeydown="handleKeyDown(event)"
                     autocomplete="off"
                 ></textarea>
@@ -1275,6 +1351,7 @@ const sidebar = document.getElementById("sidebar");
 const backdrop = document.getElementById("backdrop");
 const toastEl = document.getElementById("toast");
 const topbarTitle = document.getElementById("topbarTitle");
+const mainEl = document.querySelector(".main");
 
 const DEFAULT_NOTICE = "";
 const DEFAULT_MODEL = modelSelect.dataset.default || (modelSelect.options[0] ? modelSelect.options[0].value : "");
@@ -1744,9 +1821,115 @@ function autoResize(textarea) {
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + "px";
 }
 
+/* ---------- Typed suggestions (shown only while the user types) ---------- */
+const SUGGESTIONS = [
+    { text: "Search the web for the latest AI agent news.", tag: "Web search" },
+    { text: "What are today's top technology headlines?", tag: "Web search" },
+    { text: "What's the weather in Mumbai right now?", tag: "Weather" },
+    { text: "Will it rain in Delhi this weekend?", tag: "Weather" },
+    { text: "How is Apple stock doing today?", tag: "Stocks" },
+    { text: "How is Reliance stock doing today?", tag: "Stocks" },
+    { text: "What is the Nifty 50 at right now?", tag: "Stocks" },
+    { text: "Summarize the document I uploaded.", tag: "Documents" },
+    { text: "What are the key points in my uploaded PDF?", tag: "Documents" },
+    { text: "Remember that my favourite language is Python.", tag: "Memory" },
+    { text: "What do you remember about me?", tag: "Memory" },
+    { text: "Calculate 125 * 48 / 6", tag: "Calculator" },
+    { text: "What is 15% of 2,480?", tag: "Calculator" },
+    { text: "Explain how transformers work in deep learning.", tag: "Explain" },
+    { text: "Explain the difference between RAG and fine-tuning.", tag: "Explain" },
+    { text: "Write a Python function to reverse a string.", tag: "Code" },
+    { text: "Help me write a professional email to my manager.", tag: "Writing" },
+    { text: "Give me a 3-day itinerary for Goa.", tag: "Plan" },
+];
+
+const suggestBox = document.getElementById("suggestBox");
+let suggestItems = [];
+let suggestIndex = -1;
+
+function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function highlightMatches(text, words) {
+    let html = escapeHtml(text);
+    words.filter(Boolean).sort((a, b) => b.length - a.length).forEach(w => {
+        const re = new RegExp("(" + escapeHtml(w).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+        html = html.replace(re, "<mark>$1</mark>");
+    });
+    return html;
+}
+
+function onComposerInput(el) {
+    autoResize(el);
+    updateSuggestions(el.value);
+}
+
+function updateSuggestions(value) {
+    const q = value.trim().toLowerCase();
+    if (q.length < 2 || value.includes("\n")) { hideSuggestions(); return; }
+
+    const words = q.split(/\s+/);
+    suggestItems = SUGGESTIONS.filter(s => {
+        const hay = s.text.toLowerCase();
+        return words.every(w => hay.includes(w)) || s.tag.toLowerCase().startsWith(q);
+    }).slice(0, 5);
+
+    if (!suggestItems.length || (suggestItems.length === 1 && suggestItems[0].text.toLowerCase() === q)) {
+        hideSuggestions();
+        return;
+    }
+
+    suggestIndex = -1;
+    suggestBox.innerHTML = "";
+    suggestItems.forEach((s, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "suggest-item";
+        b.setAttribute("role", "option");
+        b.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'
+            + '<span class="suggest-text">' + highlightMatches(s.text, words) + '</span>'
+            + '<span class="suggest-tag">' + escapeHtml(s.tag) + '</span>';
+        b.addEventListener("mousedown", (e) => { e.preventDefault(); pickSuggestion(i); });
+        suggestBox.appendChild(b);
+    });
+    suggestBox.classList.add("show");
+}
+
+function hideSuggestions() {
+    suggestBox.classList.remove("show");
+    suggestBox.innerHTML = "";
+    suggestItems = [];
+    suggestIndex = -1;
+}
+
+function moveSuggestion(delta) {
+    if (!suggestItems.length) return;
+    suggestIndex = (suggestIndex + delta + suggestItems.length) % suggestItems.length;
+    Array.from(suggestBox.children).forEach((el, i) => el.classList.toggle("active", i === suggestIndex));
+}
+
+function pickSuggestion(i) {
+    const s = suggestItems[i];
+    if (!s) return;
+    messageInput.value = s.text;
+    autoResize(messageInput);
+    hideSuggestions();
+    messageInput.focus();
+}
+
+messageInput.addEventListener("blur", () => setTimeout(hideSuggestions, 150));
+
 function handleKeyDown(event) {
+    const open = suggestBox.classList.contains("show");
+    if (open && event.key === "ArrowDown") { event.preventDefault(); moveSuggestion(1); return; }
+    if (open && event.key === "ArrowUp") { event.preventDefault(); moveSuggestion(-1); return; }
+    if (open && event.key === "Escape") { event.preventDefault(); hideSuggestions(); return; }
+    if (open && event.key === "Tab" && suggestIndex >= 0) { event.preventDefault(); pickSuggestion(suggestIndex); return; }
     if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
+        if (open && suggestIndex >= 0) { pickSuggestion(suggestIndex); return; }
+        hideSuggestions();
         sendMessage();
     }
 }
@@ -1766,6 +1949,7 @@ function hideWelcome() {
     const cards = document.getElementById("cards");
     if (welcome) welcome.remove();
     if (cards) cards.remove();
+    mainEl.classList.remove("empty");
 }
 
 /* ---------- Messages ---------- */
@@ -1943,42 +2127,11 @@ async function loadConversation(selectedThreadId) {
 function renderWelcome() {
     topbarTitle.textContent = "Agentic AI Chatbot";
     document.title = "KrixGPT";
+    mainEl.classList.add("empty");
     chatContainer.innerHTML = `
         <div class="welcome" id="welcome">
-            <h1>How can I help you today?</h1>
-            <p>Ask questions, upload documents, search the web, and chat with memory.</p>
-        </div>
-        <div class="cards" id="cards">
-            <button class="card" onclick="usePrompt('Search the web for the latest AI agent news.')">
-                <span class="card-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
-                <span>Search the web</span>
-                <span class="card-sub">Latest AI agent news</span>
-            </button>
-            <button class="card" onclick="usePrompt('Summarize the document I uploaded.')">
-                <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></svg></span>
-                <span>Summarize a document</span>
-                <span class="card-sub">Upload a PDF, DOCX or TXT first</span>
-            </button>
-            <button class="card" onclick="usePrompt('Remember that my favourite language is Python.')">
-                <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M12 3a4 4 0 0 0-4 4v1a4 4 0 0 0-3 4v1a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-1a4 4 0 0 0-3-4V7a4 4 0 0 0-4-4z"/></svg></span>
-                <span>Save to memory</span>
-                <span class="card-sub">Store a fact for later</span>
-            </button>
-            <button class="card" onclick="usePrompt('What is the weather in Mumbai right now?')">
-                <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></span>
-                <span>Check the weather</span>
-                <span class="card-sub">Live conditions and forecast</span>
-            </button>
-            <button class="card" onclick="usePrompt('How is Apple stock doing today?')">
-                <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></span>
-                <span>Stock prices</span>
-                <span class="card-sub">Quotes and market stats</span>
-            </button>
-            <button class="card" onclick="usePrompt('Calculate 125 * 48 / 6')">
-                <span class="card-icon"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M12 10h2M16 10h0M8 14h2M12 14h2M16 14h0M8 18h2M12 18h2M16 18h0"/></svg></span>
-                <span>Use the calculator</span>
-                <span class="card-sub">125 × 48 ÷ 6</span>
-            </button>
+            <h1>What can I help with?</h1>
+            <p>Ask anything, upload a document, or start typing to see suggestions.</p>
         </div>
     `;
 }
@@ -2002,6 +2155,7 @@ function parseSSEPart(part) {
 async function sendMessage() {
     const message = messageInput.value.trim();
     if (!message || sendBtn.disabled) return;
+    hideSuggestions();
     if (isDictating) stopDictation();
 
     const selectedModel = modelSelect.value || DEFAULT_MODEL;
