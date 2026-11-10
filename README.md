@@ -159,6 +159,10 @@ so chats, memories and uploads reset on redeploy.
 
 ### Any VM with Docker (AWS, GCP, etc.)
 
+Tested target: an AWS EC2 t3.micro (Ubuntu 24.04). New AWS accounts get a
+credit pool valid for about six months instead of the old 12-month free tier;
+a t3.micro plus a public IPv4 address fits comfortably inside it.
+
 `docker-compose.prod.yml` adds a Caddy reverse proxy with automatic Let's Encrypt
 HTTPS (required for Google sign-in); `docker-compose.hub.yml` pulls the published
 image instead of building on the server.
