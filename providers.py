@@ -39,12 +39,13 @@ PROVIDERS = {
 
 # Ordered: the first model whose provider has a key becomes the default.
 MODELS = [
-    ("grok-4-fast", "xai", "Grok 4 Fast"),
-    ("grok-4", "xai", "Grok 4"),
-    ("grok-3-mini", "xai", "Grok 3 Mini"),
+    # Groq first: it is the default provider whenever its key is configured.
     ("openai/gpt-oss-120b", "groq", "GPT-OSS 120B"),
     ("qwen/qwen3.8-27b", "groq", "Qwen 3.8 27B"),
     ("openai/gpt-oss-20b", "groq", "GPT-OSS 20B (fastest)"),
+    ("grok-4-fast", "xai", "Grok 4 Fast"),
+    ("grok-4", "xai", "Grok 4"),
+    ("grok-3-mini", "xai", "Grok 3 Mini"),
     ("gemini-3.8-flash", "gemini", "Gemini 3.8 Flash"),
     ("gemini-3.7-flash", "gemini", "Gemini 3.7 Flash"),
     ("gemini-3.5-flash", "gemini", "Gemini 3.5 Flash"),
