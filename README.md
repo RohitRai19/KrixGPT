@@ -170,8 +170,14 @@ image instead of building on the server.
 ```bash
 # on the server, after installing Docker and cloning the repo
 nano .env                                  # keys from the table above, plus DOMAIN=your.host.name
+mkdir -p data chroma_db uploads            # create the data folders as your user (uid 1000) so the
+                                           # non-root app user inside the container can write to them
 docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hub.yml up -d
 ```
+
+If the app container keeps restarting with "unable to open database file" or
+"Permission denied", the folders were created by Docker as root: run
+`sudo chown -R 1000:1000 data chroma_db uploads` and restart the service.
 
 Add the domain to Firebase's authorized domains. On a 1 GB instance, add 2 GB of
 swap before the first start. Data lives in bind-mounted folders on the instance
