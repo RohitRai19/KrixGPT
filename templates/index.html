@@ -1093,7 +1093,7 @@ textarea:focus-visible,
     padding-right: 6px;
 }
 
-.history-title {
+.history-label {
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -2257,7 +2257,7 @@ function ctxRename() {
     const conv = ctxConv; closeCtxMenu();
     if (!conv) return;
     const row = conversationList.querySelector(`.history-item[data-thread-id="${conv.thread_id}"]`);
-    const titleEl = row && row.querySelector(".history-title");
+    const titleEl = row && row.querySelector(".history-label");
     if (!row || !titleEl) return;
 
     const input = document.createElement("input");
@@ -2378,7 +2378,7 @@ async function loadConversations() {
             }
 
             const text = document.createElement("span");
-            text.className = "history-title";
+            text.className = "history-label";
             text.textContent = label;
             text.title = label;
             item.appendChild(text);
