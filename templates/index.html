@@ -322,6 +322,14 @@ textarea:focus-visible,
 
 .topbar .menu-btn { display: none; }
 
+/* Desktop: the sidebar can be collapsed with its close button; the header's
+   menu button brings it back. (On phones the sidebar is a drawer instead.) */
+@media (min-width: 901px) {
+    .app.collapsed { grid-template-columns: 1fr; }
+    .app.collapsed .sidebar { display: none; }
+    .app.collapsed .topbar .menu-btn { display: grid; }
+}
+
 .topbar-title {
     font-weight: 600;
     font-size: 15px;
@@ -1774,17 +1782,35 @@ function toggleTheme() {
 }
 
 /* ---------- Sidebar (mobile drawer) ---------- */
+const appEl = document.querySelector(".app");
+
 function openSidebar() {
+    if (!isMobile()) {
+        appEl.classList.remove("collapsed");
+        safeSet("sidebar_collapsed", "0");
+        return;
+    }
     sidebar.classList.add("open");
     backdrop.classList.add("show");
     sidebar.setAttribute("aria-modal", "true");
 }
 
 function closeSidebar() {
+    if (!isMobile()) {
+        // Desktop: collapse the column entirely; the header menu button restores it.
+        if (!sidebar.classList.contains("open")) {
+            appEl.classList.add("collapsed");
+            safeSet("sidebar_collapsed", "1");
+        }
+        return;
+    }
     sidebar.classList.remove("open");
     backdrop.classList.remove("show");
     sidebar.removeAttribute("aria-modal");
 }
+
+// Restore the desktop collapse preference.
+if (safeGet("sidebar_collapsed") === "1") appEl.classList.add("collapsed");
 
 function isMobile() {
     return window.matchMedia("(max-width: 900px)").matches;
