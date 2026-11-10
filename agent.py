@@ -100,6 +100,21 @@ def build_agent(model_name: str):
     return workflow.compile(checkpointer=checkpointer)
 
 
+CHECKPOINT_DB = "data/langgraph_checkpoints.sqlite"
+
+
+def delete_thread_checkpoints(thread_id: str) -> None:
+    """Forget the LangGraph state of a deleted conversation."""
+    try:
+        conn = sqlite3.connect(CHECKPOINT_DB, check_same_thread=False)
+        try:
+            SqliteSaver(conn).delete_thread(thread_id)
+        finally:
+            conn.close()
+    except Exception as exc:
+        print(f"Checkpoint cleanup skipped for {thread_id}: {type(exc).__name__}")
+
+
 _AGENT_CACHE = {}
 
 

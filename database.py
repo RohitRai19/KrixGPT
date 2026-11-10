@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, inspect, text
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, inspect, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import OperationalError
 
@@ -25,6 +25,7 @@ class Conversation(Base):
     thread_id = Column(String, unique=True, index=True)
     user_id = Column(String, index=True, nullable=True)
     title = Column(String, default="New Chat")
+    pinned = Column(Boolean, default=False, nullable=False, server_default="0")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 
@@ -82,6 +83,14 @@ def _migrate():
                     raise
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_conversations_user_id ON conversations (user_id)"))
 
+    if "pinned" not in columns:
+        with engine.begin() as conn:
+            try:
+                conn.execute(text("ALTER TABLE conversations ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT 0"))
+            except OperationalError as exc:
+                if "duplicate column" not in str(exc).lower():
+                    raise
+
 
 def create_or_update_conversation(
     thread_id: str,
@@ -138,7 +147,7 @@ def list_conversations(user_id: str | None = None):
         if user_id is not None:
             query = query.filter(Conversation.user_id == user_id)
 
-        return query.order_by(Conversation.updated_at.desc()).all()
+        return query.order_by(Conversation.pinned.desc(), Conversation.updated_at.desc()).all()
 
     finally:
         db.close()
@@ -156,7 +165,7 @@ def list_conversations_by_ids(thread_ids: list[str]):
             db.query(Conversation)
             .filter(Conversation.thread_id.in_(thread_ids))
             .filter(Conversation.user_id.is_(None))
-            .order_by(Conversation.updated_at.desc())
+            .order_by(Conversation.pinned.desc(), Conversation.updated_at.desc())
             .all()
         )
 
@@ -226,6 +235,38 @@ def update_conversation_title(thread_id: str, title: str) -> None:
         if conversation and title:
             conversation.title = title[:80]
             db.commit()
+
+    finally:
+        db.close()
+
+
+def set_conversation_pinned(thread_id: str, pinned: bool) -> bool:
+    db = SessionLocal()
+
+    try:
+        conversation = db.query(Conversation).filter(Conversation.thread_id == thread_id).first()
+        if not conversation:
+            return False
+        conversation.pinned = bool(pinned)
+        db.commit()
+        return True
+
+    finally:
+        db.close()
+
+
+def delete_conversation(thread_id: str) -> bool:
+    """Delete a conversation and its messages. Memories are owner-scoped and kept."""
+    db = SessionLocal()
+
+    try:
+        conversation = db.query(Conversation).filter(Conversation.thread_id == thread_id).first()
+        if not conversation:
+            return False
+        db.query(ChatMessage).filter(ChatMessage.thread_id == thread_id).delete(synchronize_session=False)
+        db.delete(conversation)
+        db.commit()
+        return True
 
     finally:
         db.close()

@@ -23,7 +23,7 @@ from langchain_core.messages import (
     ToolMessage
 )
 
-from agent import get_agent
+from agent import get_agent, delete_thread_checkpoints
 from database import (
     init_db,
     save_chat_message,
@@ -35,6 +35,8 @@ from database import (
     claim_memories,
     conversation_owner,
     update_conversation_title,
+    set_conversation_pinned,
+    delete_conversation,
     count_messages)
 
 from titles import generate_title
@@ -48,7 +50,7 @@ from auth import (
     get_current_user,
     get_optional_user)
 
-from rag import add_document_to_rag
+from rag import add_document_to_rag, delete_thread_documents
 from tools import set_current_thread_id, set_current_owner_id
 
 
@@ -181,12 +183,66 @@ async def conversations(
             {
                 "thread_id": item.thread_id,
                 "title": item.title,
+                "pinned": bool(item.pinned),
                 "created_at": item.created_at.isoformat(),
                 "updated_at": item.updated_at.isoformat()
             }
             for item in items
         ]
     }
+
+
+@app.patch("/conversations/{thread_id}")
+async def update_conversation(
+    thread_id: str,
+    request: Request,
+    user: dict | None = Depends(get_optional_user)
+):
+    """Rename and/or pin a conversation."""
+    _ensure_owner(thread_id, user)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON body."}, status_code=400)
+
+    changed = {}
+
+    if "title" in data:
+        title = str(data.get("title") or "").strip()
+        if not title:
+            return JSONResponse({"error": "Title cannot be empty."}, status_code=400)
+        update_conversation_title(thread_id, title[:80])
+        changed["title"] = title[:80]
+
+    if "pinned" in data:
+        pinned = bool(data.get("pinned"))
+        if not set_conversation_pinned(thread_id, pinned):
+            return JSONResponse({"error": "Conversation not found."}, status_code=404)
+        changed["pinned"] = pinned
+
+    if not changed:
+        return JSONResponse({"error": "Nothing to update."}, status_code=400)
+
+    return {"success": True, **changed}
+
+
+@app.delete("/conversations/{thread_id}")
+async def remove_conversation(
+    thread_id: str,
+    user: dict | None = Depends(get_optional_user)
+):
+    """Delete a conversation, its messages, its graph state and its uploaded documents."""
+    _ensure_owner(thread_id, user)
+
+    existed = delete_conversation(thread_id)
+    delete_thread_checkpoints(thread_id)
+    delete_thread_documents(thread_id)
+
+    if not existed:
+        return JSONResponse({"success": False, "error": "Conversation not found."}, status_code=404)
+
+    return {"success": True}
 
 
 

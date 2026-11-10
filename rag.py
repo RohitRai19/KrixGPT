@@ -89,6 +89,14 @@ def add_document_to_rag(file_path: str, thread_id: str):
 
 
 
+def delete_thread_documents(thread_id: str) -> None:
+    """Remove every chunk that was uploaded in this conversation."""
+    try:
+        vectorstore.delete(where={"thread_id": thread_id})
+    except Exception as exc:  # nothing indexed for this thread, or store unavailable
+        print(f"RAG cleanup skipped for {thread_id}: {type(exc).__name__}")
+
+
 def retrieve_from_rag(query: str, thread_id: str, k: int = 4) -> str:
     docs = vectorstore.similarity_search(
         query,
